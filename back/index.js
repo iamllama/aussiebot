@@ -4,6 +4,8 @@ const Redis = require("ioredis");
 const db = require('./db')
 const { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid } = require("../util");
 
+const gambleRand = random.uniformInt(1, 100);
+
 const pub = new Redis(redisOpt);
 const sub = new Redis(redisOpt);
 sub.subscribe(upstreamChannel);
@@ -31,8 +33,27 @@ const processMsg = async (origMsg) => {
 
   console.log(msg);
 
-  const instanceId = msg[0], bot_type = msg[1], msg_type = msg[2], src_id = msg[3];
+  const instanceId = msg[0], bot_type = msg[1], msg_type = msg[2];
 
+  // msg types that don't need src user resolved
+  switch (msg_type) {
+    case msgType.STARTED:
+      console.log(instanceId, "started up");
+      return;
+    case msgType.SCRAPE_POINTS: {
+      const target_name = msg[3], amount = msg[4];
+      const target_key = getKey(bot_type, target_name);
+      console.log("SCRAPE_POINTS", target_key, amount);
+      await setUser(db, target_key, { points: amount });
+      return;
+    }
+    default:
+      break;
+  }
+
+  const src_id = msg[3];
+
+  // TODO: refactor out
   // add user if not alr in db
   const key = getKey(bot_type, src_id);
   let res = await getUser(db, key);
@@ -46,9 +67,6 @@ const processMsg = async (origMsg) => {
   const src = res[0];
 
   switch (msg_type) {
-    case msgType.STARTED:
-      console.log(instanceId, "started up");
-      break;
     case msgType.POINTS:
       pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.POINTS, src_id, src.points]));
       break;
@@ -92,10 +110,31 @@ const processMsg = async (origMsg) => {
         console.error(e);
       }
       break;
+    case msgType.GAMBLE: {
+      const amount = msg[4];
+      if (amount > 10000) {
+        informErr(instanceId, src_id, "Wager limited to 10000");
+        break;
+      } else if (src.points < amount) {
+        informErr(instanceId, src_id, "Not enough points");
+        break;
+      }
+      const roll = gambleRand();
+      let delta = 0;
+      if (roll <= 50) {
+        delta = -amount;
+      } else {
+        delta = amount;
+      }
+      const res = await setUser(db, key, { points: src.points + delta }, ["points"]);
+      const src1 = res[0];
+      pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.GAMBLE, src_id, roll, delta, src1.points]));
+      break;
+    }
     case msgType.COMMAND: {
       const name = msg[4];
       if (name === "french") {
-        const res = await getBlague();
+        const res = await getBlague(/*random.boolean()*/false);
         const { error, joke, vdm } = await res.json();
         if (!error) {
           const text = joke ? `${joke.question} ${joke.answer}` : vdm.content;
@@ -143,6 +182,21 @@ const getKey = (type, id) => {
   console.log("getKey", key);
   return key;
 }
+
+/*
+const getOrAddUser = (db, bot_type, src_id) => {
+  const key = getKey(bot_type, src_id);
+  let res = await getUser(db, key);
+  if (!res.length) {
+    res = await addUser(db, bot_type, src_id);
+  } else if (res.length > 1) {
+    console.error("non unique id", key, res);
+    //informErr(instanceId, src_id, "Non-unique id");
+    return null;
+  }
+  const src = res[0];
+  return src;
+}*/
 
 const getUser = (db, key, col) => {
   const query = [];
@@ -195,7 +249,7 @@ const setUser = (db, key, rec, col) => {
   const ret = (!col || !col.length) ? "" : `RETURNING ${col.join(", ")}`;
   const q = `UPDATE users SET ${query.join(", ")} WHERE ${keys.join(" AND ")} ${ret}`;
   console.log("setUser", q, val);
-  return db.query(q, val);
+  return db.query(q, val).then(res => res.rows);
 }
 
 const getCommand = (db, name) => {
@@ -204,4 +258,4 @@ const getCommand = (db, name) => {
   return db.query(q, [name]).then(res => res.rows);
 }
 
-const getBlague = () => fetch(`https://blague.xyz/api/${random.boolean() ? "vdm" : "joke"}/random`, { method: "Get" });
+const getBlague = (vdm) => fetch(`https://blague.xyz/api/${vdm ? "vdm" : "joke"}/random`, { method: "Get" });

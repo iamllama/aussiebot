@@ -60,9 +60,7 @@ client.on('interactionCreate', async interaction => {
       const amount = interaction.options.getNumber("points", true);
       await interaction.deferReply();
       callbacks[id] = interaction;
-      await wait(2000);
-      callbacks[id].editReply(`blah`);
-      delete callbacks[id];
+      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.GAMBLE, id, amount]));
       break;
     default:
       await interaction.deferReply();
@@ -139,6 +137,11 @@ const processMsg = (origMsg) => {
       const text = msg[3] ?? "Error";
       callbacks[id].editReply({ content: `⚠️ ${text}`, ephemeral: true });
       delete callbacks[id];
+      break;
+    }
+    case msgType.GAMBLE: {
+      const roll = msg[3], delta = msg[4], points = msg[5];
+      callbacks[id].editReply({ content: `gamble: roll ${roll} delta @${delta}, ${points} point(s)` });
       break;
     }
     default:

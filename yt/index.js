@@ -18,7 +18,7 @@ const processChat = (chat) => {
   const id = chat?.author?.channelId;
   const name = chat?.author?.name;
   const source = [id, name];
-  if (cmd != null) {
+  if (cmd !== null) {
     // !-command
     console.log(cmd);
     const cmdName = cmd[1];
@@ -28,6 +28,14 @@ const processChat = (chat) => {
     // normal chat msg
     pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.CHAT, source]));
   }
+  // Streamlabs's bot id
+  if (id == "UCNL8jaJ9hId96P13QmQXNtA") {
+    const re = /^@(.+), you have (\d+) Points?/.exec(msg);
+    if (re !== null) {
+      const target = re[1], amount = re[2];
+      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.SCRAPE_POINTS, target, amount]));
+    }
+  }
 }
 
 const processCommand = (cmd, source, msg) => {
@@ -36,10 +44,15 @@ const processCommand = (cmd, source, msg) => {
       pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.POINTS, source]));
       break;
     case "gamble": {
-      const res = /^!gamble\s(\d+)\s*$/.exec(msg)
+      const res = /^!gamble\s(\d+|all)\s*$/.exec(msg)
       if (!res) break;
       try {
-        const amount = parseInt(res[1]);
+        let amount = 0;
+        if (res[1] === "all") {
+          amount = 10000;
+        } else {
+          amount = parseInt(res[1]);
+        }
         pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.GAMBLE, source, amount]));
       } catch (e) { console.error(e); }
       break;
@@ -95,13 +108,11 @@ liveChat.on("chat", processChat);
 // err: Error or any
 liveChat.on("error", console.error)
 
-/*
 liveChat.start().then((ok) => {
   if (!ok) {
     console.log("Failed to start, check emitted error")
   }
 }).catch(console.log);
-*/
 
 const readline = require('readline'), rl = readline.createInterface(process.stdin, process.stdout);
 const source = ["UCtBkiI649CihbY3MyA-91kA3", "a_llama3"];
@@ -152,6 +163,11 @@ const processMsg = (origMsg) => {
     case msgType.GIVE: {
       const [_, src_name] = msg[2], target_name = msg[3], amount = msg[4];
       console.log(`@${src_name} gave @${target_name} ${amount} point(s)`);
+      break;
+    }
+    case msgType.GAMBLE: {
+      const [_, src_name] = msg[2], roll = msg[3], delta = msg[4], points = msg[5];
+      console.log(`gamble: @${src_name} roll ${roll} delta @${delta}, ${points} point(s)`);
       break;
     }
     case msgType.COMMAND: {

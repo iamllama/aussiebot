@@ -25,7 +25,8 @@ const msgType = Object.freeze({
   GIVE: 6,
   GAMBLE: 7,
   HEIST: 8,
-  LINK: 9
+  LINK: 9,
+  SCRAPE_POINTS: 10
 });
 
 const pubMsgIsValid = (msg) => true; //TODO
