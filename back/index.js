@@ -132,13 +132,15 @@ const getKey = (type, id) => {
 
 const getUser = (db, key, col) => {
   const query = [];
+  const val = [];
   for (const col in key) {
-    query.push(`${col} = '${key[col]}'`);
+    val.push(key[col]);
+    query.push(`${col} = $${val.length}`);
   }
   const ret = (!col || !col.length) ? "*" : col.join(", ");
   const q = `SELECT ${ret} FROM users WHERE ${query.join(", ")}`;
-  console.log("getUser", q);
-  return db.query(q).then(res => res.rows);
+  console.log("getUser", q, val);
+  return db.query(q, val).then(res => res.rows);
 }
 
 const addUser = (db, type, id, col) => {
@@ -167,61 +169,23 @@ const addUser = (db, type, id, col) => {
 const setUser = (db, key, rec, col) => {
   const keys = [];
   const query = [];
+  const val = [];
   for (const col in key) {
-    keys.push(`${col} = '${key[col]}'`);
+    val.push(key[col]);
+    keys.push(`${col} = $${val.length}`);
   }
   for (const col in rec) {
-    query.push(`${col} = '${rec[col]}'`);
+    val.push(rec[col]);
+    query.push(`${col} = $${val.length}`);
   }
   const ret = (!col || !col.length) ? "" : `RETURNING ${col.join(", ")}`;
   const q = `UPDATE users SET ${query.join(", ")} WHERE ${keys.join(" AND ")} ${ret}`;
-  console.log("setUser", q);
-  return db.query(q);
+  console.log("setUser", q, val);
+  return db.query(q, val);
 }
 
 const getCommand = (db, name) => {
   const q = `SELECT msg FROM commands WHERE name = $1`;
-  console.log("getCommand", q);
+  console.log("getCommand", q, name);
   return db.query(q, [name]).then(res => res.rows);
 }
-
-/*
-const getUserByYtId = (id) => {
-  return db.query("SELECT * FROM users WHERE ytid = $1", [id]).then(res => res.rows);
-}
-
-const getUserByYtName = (name) => {
-  return db.query("SELECT * FROM users WHERE ytname = $1", [name]).then(res => res.rows);
-}
-
-const getUserByTwitchId = (id) => {
-  const q = `SELECT * FROM users WHERE twitchid = '${id}'`;
-  db.query(q).then(console.log);
-}
-
-const getUserByDiscordId = (id) => {
-  const q = `SELECT * FROM users WHERE discordid = '${id}'`;
-  db.query(q).then(console.log);
-}
-
-const setUserByYtName = (name, rec) => {
-  const query = [];
-  for (const key in rec) {
-    query.push(`${key} = '${rec[key]}'`);
-  }
-  const q = 'UPDATE users SET ' + query.join(", ") + ` WHERE ytname = '${name}' RETURNING *`;
-  console.log("setUserByYtName", q);
-  return db.query(q).then(res => res.rows);
-}
-
-const setUserByYtId = (id, rec) => {
-  const query = [];
-  for (const key in rec) {
-    query.push(`${key} = '${rec[key]}'`);
-  }
-  const q = 'UPDATE users SET ' + query.join(", ") + ` WHERE ytid = '${id}' RETURNING *`;
-  console.log("setUserByYtId", q);
-  return db.query(q).then(res => res.rows);
-}
-
-const addUserYt = (id, name) => db.query('INSERT INTO users (ytid, ytname) VALUES ($1, $2) RETURNING *', [id, name]).then(res => res.rows);*/
