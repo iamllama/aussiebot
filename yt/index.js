@@ -38,7 +38,11 @@ const processChat = (chat) => {
   }
 }
 
-const processCommand = (cmd, source, msg) => {
+const processCommand = async (cmd, source, msg) => {
+  if (await rateLimited(source[0])) {
+    console.log(source, "rate-limited");
+    return;
+  }
   switch (cmd) {
     case "points":
       pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.POINTS, source]));
@@ -184,4 +188,18 @@ const processMsg = (origMsg) => {
       break;
   }
 
+}
+
+const rateliimitDelay = 10; // seconds
+
+const rateLimited = async (id) => {
+  const key = `${instanceId}$rate$${id}`;
+  const check = await pub.get(key);
+  if (check === null) {
+    await pub.set(key, "", "ex", rateliimitDelay);
+    return false;
+  } else {
+    // rate-limited
+    return true;
+  }
 }

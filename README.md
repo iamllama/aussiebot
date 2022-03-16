@@ -9,7 +9,7 @@ Still a work in progress!
 |---	|---	|---	|---	|
 | Check points 	| ✅ 	| ✅ 	|  	|
 | Give points 	| ✅ 	| ✅ 	|  	|
-| Gamble 	| 🔧 	| 🔧 	|  	|
+| Gamble 	| ✅ 	| ✅ 	|  	|
 | Link points 	| 🔧 	| 🔧 	|  	|
 | Minigames 	|  	|  	|  	|
 
