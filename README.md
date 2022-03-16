@@ -1,9 +1,20 @@
 # aussiebot 🤖
 
-A yt-discord-twitch bot
+A yt-discord-twitch bot system
 
 Still a work in progress!
 
+### Progress
+| Features 	| Youtube 	| Discord 	| Twitch 	|
+|---	|---	|---	|---	|
+| Check points 	| ✅ 	| ✅ 	|  	|
+| Give points 	| ✅ 	| ✅ 	|  	|
+| Gamble 	| 🔧 	| 🔧 	|  	|
+| Link points 	| 🔧 	| 🔧 	|  	|
+| Minigames 	|  	|  	|  	|
+
+
+  
 # Why
 
 Cloudbot replacement, for tracking points and hours and hosting minigames
