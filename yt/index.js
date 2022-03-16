@@ -15,13 +15,18 @@ const processChat = (chat) => {
   console.log(chat);
   const msg = chat?.message[0]?.text;
   const cmd = /^!(\w+)/.exec(msg);
+  const id = chat?.author?.channelId;
+  const name = chat?.author?.name;
+  const source = [id, name];
   if (cmd != null) {
+    // !-command
     console.log(cmd);
     const cmdName = cmd[1];
-    const id = chat?.author?.channelId;
-    const name = chat?.author?.name;
     const msg = chat?.message[0]?.text;
-    processCommand(cmdName, [id, name], msg);
+    processCommand(cmdName, source, msg);
+  } else {
+    // normal chat msg
+    pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.CHAT, source]));
   }
 }
 
@@ -99,6 +104,7 @@ liveChat.start().then((ok) => {
 */
 
 const readline = require('readline'), rl = readline.createInterface(process.stdin, process.stdout);
+const source = ["UCtBkiI649CihbY3MyA-91kA3", "a_llama3"];
 
 rl.setPrompt('chat> ');
 rl.prompt();
@@ -106,7 +112,9 @@ rl.prompt();
 rl.on('line', function (line) {
   const cmd = /^!(\w+)/.exec(line);
   if (cmd != null) {
-    processCommand(cmd[1], ["UCtBkiI649CihbY3MyA-91kA", "a_llama"], line);
+    processCommand(cmd[1], source, line);
+  } else {
+    pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.CHAT, source]));
   }
   rl.prompt();
 }).on('close', function () {
@@ -149,8 +157,11 @@ const processMsg = (origMsg) => {
     case msgType.COMMAND: {
       const [_, src_name] = msg[2], text = msg[3];
       const res = `@${src_name} ` + text;
-      const parts = res.match(/.{1,180}/g);
-      console.log(parts);
+      const parts = res.match(/.{1,180}(\s|$)/g); //split along word boundary, unless at end
+      for (const part of parts) {
+        rl.prompt();
+        console.log(part.trim());
+      }
       break;
     }
     default:

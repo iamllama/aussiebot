@@ -17,7 +17,7 @@ sub.subscribe(downstreamChannel);
 const wait = require('node:timers/promises').setTimeout;
 
 // Create a new client instance
-const client = new Client({ intents: [] });
+const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES], partials: ["MESSAGE", "CHANNEL"] });
 
 // When the client is ready, run this code (only once)
 client.once('ready', () => {
@@ -72,6 +72,17 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+client.on('messageCreate', async message => {
+  console.log("messageCreate");
+  if (message.author.bot) return;
+  //let fullMessage = (message.partial) ? await message.fetch() : message;
+  //if (fullMessage.author.bot) return;
+  const source = message.author.id;
+  const text = message.content;
+  if (text.startsWith('!')) processChatMsg(source, text);
+  pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.CHAT, source]));
+});
+
 sub.on("message", (chn, msg) => {
   switch (chn) {
     case downstreamChannel:
@@ -81,6 +92,21 @@ sub.on("message", (chn, msg) => {
       break;
   }
 });
+
+const processChatMsg = (source, text) => {
+  const cmd = /^!(\w+)/.exec(text);
+  if (!cmd) return;
+  switch (cmd[1]) {
+    case "give":
+      const cmd = /^!give <@!(\d+)> (\d+)$/.exec(text);
+      if (cmd === null) break;
+      console.log(source, target, amount);
+      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.GIVE, source, target, amount]));
+      break;
+    default:
+      break;
+  }
+}
 
 const processMsg = (origMsg) => {
   let msg = null;

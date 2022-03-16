@@ -2,7 +2,9 @@
   "dependencies": {
     "eslint": "^8.11.0",
     "ioredis": "^4.28.5",
+    "node-fetch": "^3.2.3",
     "pg": "^8.7.3",
-    "pg-hstore": "^2.3.4"
+    "pg-hstore": "^2.3.4",
+    "random": "^3.0.6"
   }
 }

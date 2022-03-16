@@ -19,12 +19,13 @@ const msgType = Object.freeze({
   ERROR: 0,
   STARTED: 1,
   STOPPED: 2,
-  COMMAND: 3,
-  POINTS: 4,
-  GIVE: 5,
-  GAMBLE: 6,
-  HEIST: 7,
-  LINK: 8
+  CHAT: 3,
+  COMMAND: 4,
+  POINTS: 5,
+  GIVE: 6,
+  GAMBLE: 7,
+  HEIST: 8,
+  LINK: 9
 });
 
 const pubMsgIsValid = (msg) => true; //TODO

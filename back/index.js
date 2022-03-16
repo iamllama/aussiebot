@@ -1,6 +1,9 @@
-const db = require('./db')
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const random = require('random');
 const Redis = require("ioredis");
+const db = require('./db')
 const { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid } = require("../util");
+
 const pub = new Redis(redisOpt);
 const sub = new Redis(redisOpt);
 sub.subscribe(upstreamChannel);
@@ -30,42 +33,39 @@ const processMsg = async (origMsg) => {
 
   const instanceId = msg[0], bot_type = msg[1], msg_type = msg[2], src_id = msg[3];
 
+  // add user if not alr in db
+  const key = getKey(bot_type, src_id);
+  let res = await getUser(db, key);
+  if (!res.length) {
+    res = await addUser(db, bot_type, src_id);
+  } else if (res.length > 1) {
+    console.error("non unique id", key, res);
+    informErr(instanceId, src_id, "Non-unique id");
+    return;
+  }
+  const src = res[0];
+
   switch (msg_type) {
     case msgType.STARTED:
       console.log(instanceId, "started up");
       break;
     case msgType.POINTS:
-      const key = getKey(bot_type, src_id);
-      const res = await getUser(db, key, ["points"]);
-      if (res.length > 1) {
-        console.error("non unique id", key, res);
-        informErr(instanceId, src_id, "Non-unique id");
-        break;
-      } else if (res.length == 0) {
-        await addUser(db, bot_type, src_id);
-        //informErr(instanceId, src_id, "You don't have enough points");
-        //  re-emit the event in case the starting amount isn't 0
-        pub.publish(upstreamChannel, origMsg);
-        break;
-      }
-      const user = res[0];
-      pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.POINTS, src_id, user.points]));
+      pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.POINTS, src_id, src.points]));
       break;
     case msgType.GIVE:
       const target_name = msg[4], amount = msg[5];
-      const src_key = getKey(bot_type, src_id);
       const target_key = getKey(bot_type, target_name);
-      const [srcres, targetres] = await Promise.all([getUser(db, src_key), getUser(db, target_key)]);
-      if (srcres.length != 1 || targetres.length != 1) {
-        console.error("GIVE: one or both missing", src_id, target_name);
-        if (srcres.length == 0) {
-          // add src user
-          await addUser(db, bot_type, src_id);
+      let target_res = await getUser(db, target_key);
+      if (!target_res.length) {
+        if (bot_type == botType.YOUTUBE) {
+          // can't add target if yt, missing ytid
+          informErr(instanceId, src_id, "Missing user(s)");
+        } else {
+          // add target to db
+          target_res = await addUser(db, bot_type, target_name); //target_name: discordid | twitchid
         }
-        informErr(instanceId, src_id, "Missing user(s)");
-        break;
       }
-      const src = srcres[0], target = targetres[0];
+      const target = target_res[0];
       console.log(src.points, target.points);
       if (src.id === target.id ||
         (src.ytid && src.ytid === target.ytid) ||
@@ -83,7 +83,7 @@ const processMsg = async (origMsg) => {
       const cl = await db.getClient();
       try {
         await cl.query("BEGIN");
-        await Promise.all([setUser(cl, src_key, { points: src.points - amount }), setUser(cl, target_key, { points: target.points + amount })]);
+        await Promise.all([setUser(cl, key, { points: src.points - amount }), setUser(cl, target_key, { points: target.points + amount })]);
         await cl.query("COMMIT");
         pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.GIVE, src_id, target_name, amount]));
       } catch (e) {
@@ -94,13 +94,27 @@ const processMsg = async (origMsg) => {
       break;
     case msgType.COMMAND: {
       const name = msg[4];
+      if (name === "french") {
+        const res = await getBlague();
+        const { error, joke, vdm } = await res.json();
+        if (!error) {
+          const text = joke ? `${joke.question} ${joke.answer}` : vdm.content;
+          pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.COMMAND, src_id, text]));
+        }
+        break;
+      }
       const res = await getCommand(db, name);
       if (res.length) {
         const text = res[0].msg;
         pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.COMMAND, src_id, text]));
       }
-    }
       break;
+    }
+    case msgType.CHAT: {
+      console.log("CHAT", key, src.points + 2);
+      await setUser(db, key, { points: src.points + 2 });
+      break;
+    }
     default:
       break;
   }
@@ -160,10 +174,10 @@ const addUser = (db, type, id, col) => {
       val.push(id);
       break;
   }
-  query.push((!col || !col.length) ? "" : `RETURNING ${col.join(", ")}`);
+  query.push((!col || !col.length) ? "RETURNING *" : `RETURNING ${col.join(", ")}`);
   const q = query.join(" ");
   console.log("addUser", q, val);
-  return db.query(q, val);
+  return db.query(q, val).then(res => res.rows);
 }
 
 const setUser = (db, key, rec, col) => {
@@ -189,3 +203,5 @@ const getCommand = (db, name) => {
   console.log("getCommand", q, name);
   return db.query(q, [name]).then(res => res.rows);
 }
+
+const getBlague = () => fetch(`https://blague.xyz/api/${random.boolean() ? "vdm" : "joke"}/random`, { method: "Get" });
