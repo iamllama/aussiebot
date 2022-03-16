@@ -1,0 +1,160 @@
+const instanceId = "aussieyt";
+
+const { LiveChat } = require("youtube-chat");
+const Redis = require("ioredis");
+const { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid } = require("../util");
+const pub = new Redis(redisOpt);
+const sub = new Redis(redisOpt);
+sub.subscribe(downstreamChannel);
+
+
+// Or specify LiveID in Stream manually.
+const liveChat = new LiveChat({ liveId: "" })
+
+const processChat = (chat) => {
+  console.log(chat);
+  const msg = chat?.message[0]?.text;
+  const cmd = /^!(\w+)/.exec(msg);
+  if (cmd != null) {
+    console.log(cmd);
+    const cmdName = cmd[1];
+    const id = chat?.author?.channelId;
+    const name = chat?.author?.name;
+    const msg = chat?.message[0]?.text;
+    processCommand(cmdName, [id, name], msg);
+  }
+}
+
+const processCommand = (cmd, source, msg) => {
+  switch (cmd) {
+    case "points":
+      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.POINTS, source]));
+      break;
+    case "gamble": {
+      const res = /^!gamble\s(\d+)\s*$/.exec(msg)
+      if (!res) break;
+      try {
+        const amount = parseInt(res[1]);
+        pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.GAMBLE, source, amount]));
+      } catch (e) { console.error(e); }
+      break;
+    }
+    case "heist": {
+      const res = /^!heist\s(\d+)\s*$/.exec(msg);
+      if (!res) break;
+      try {
+        const amount = parseInt(res[1]);
+        pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.HEIST, source, amount]));
+      } catch (e) { console.error(e); }
+      break;
+    }
+    case "give": {
+      const res = /^!give\s@?(.+)\s(\d+)$/.exec(msg);
+      if (!res) break;
+      try {
+        const target = res[1]
+        const amount = parseInt(res[2]);
+        pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.GIVE, source, target, amount]));
+      } catch (e) { console.error(e); }
+      break;
+    }
+    default:
+      const res = /^!(\w+)\s*$/.exec(msg);
+      if (!res) break;
+      const cmd = res[1];
+      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.COMMAND, source, cmd]));
+      break;
+  }
+};
+
+
+// Emit at start of observation chat.
+// liveId: string
+liveChat.on("start", (liveId) => {
+  console.log(JSON.stringify([instanceId, botType.YOUTUBE, msgType.STARTED, liveId]));
+  pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.STARTED, liveId]));
+})
+
+// Emit at end of observation chat.
+// reason: string?
+liveChat.on("end", (reason) => {
+  console.log(JSON.stringify([instanceId, botType.YOUTUBE, msgType.STOPPED, reason]));
+  pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.STOPPED, reason]));
+})
+
+// Emit at receive chat.
+// chat: ChatItem
+liveChat.on("chat", processChat);
+
+// Emit when an error occurs
+// err: Error or any
+liveChat.on("error", console.error)
+
+/*
+liveChat.start().then((ok) => {
+  if (!ok) {
+    console.log("Failed to start, check emitted error")
+  }
+}).catch(console.log);
+*/
+
+const readline = require('readline'), rl = readline.createInterface(process.stdin, process.stdout);
+
+rl.setPrompt('chat> ');
+rl.prompt();
+
+rl.on('line', function (line) {
+  const cmd = /^!(\w+)/.exec(line);
+  if (cmd != null) {
+    processCommand(cmd[1], ["UCtBkiI649CihbY3MyA-91kA", "a_llama"], line);
+  }
+  rl.prompt();
+}).on('close', function () {
+  console.log('Have a great day!');
+  process.exit(0);
+});
+
+sub.on("message", (chn, msg) => {
+  switch (chn) {
+    case downstreamChannel:
+      processMsg(msg);
+      break;
+    default:
+      break;
+  }
+});
+
+const processMsg = (origMsg) => {
+  let msg = null;
+  try {
+    msg = JSON.parse(origMsg);
+  } catch (e) {
+    debug(e);
+    return;
+  }
+
+  if (!pubMsgIsValid(msg) || msg[0] != instanceId) return;
+
+  switch (msg[1]) {
+    case msgType.POINTS: {
+      const [bot_type, src_name] = msg[2], points = msg[3];
+      console.log(`@${src_name}, you have ${points} points`);
+      break;
+    }
+    case msgType.GIVE: {
+      const [_, src_name] = msg[2], target_name = msg[3], amount = msg[4];
+      console.log(`@${src_name} gave @${target_name} ${amount} point(s)`);
+      break;
+    }
+    case msgType.COMMAND: {
+      const [_, src_name] = msg[2], text = msg[3];
+      const res = `@${src_name} ` + text;
+      const parts = res.match(/.{1,180}/g);
+      console.log(parts);
+      break;
+    }
+    default:
+      break;
+  }
+
+}
