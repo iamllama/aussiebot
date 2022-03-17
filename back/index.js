@@ -40,6 +40,9 @@ const processMsg = async (origMsg) => {
     case msgType.STARTED:
       console.log(instanceId, "started up");
       return;
+    case msgType.STOPPED:
+      console.log(instanceId, "stopped");
+      return;
     case msgType.SCRAPE_POINTS: {
       const target_name = msg[3], amount = msg[4];
       const target_key = getKey(bot_type, target_name);
@@ -112,8 +115,8 @@ const processMsg = async (origMsg) => {
       break;
     case msgType.GAMBLE: {
       const amount = msg[4];
-      if (amount > 10000) {
-        informErr(instanceId, src_id, "Wager limited to 10000");
+      if (10000 > amount || amount < 10) {
+        informErr(instanceId, src_id, "Wager must be between 10 and 10000");
         break;
       } else if (src.points < amount) {
         informErr(instanceId, src_id, "Not enough points");
@@ -123,6 +126,8 @@ const processMsg = async (origMsg) => {
       let delta = 0;
       if (roll <= 50) {
         delta = -amount;
+      } else if (roll >= 99) {
+        delta = 2 * amount;
       } else {
         delta = amount;
       }

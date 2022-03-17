@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@google-cloud/local-auth": "^1.0.1",
     "googleapis": "^97.0.0",
     "ioredis": "^4.28.5",
     "youtube-chat": "^2.1.1"

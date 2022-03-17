@@ -1,5 +1,7 @@
-const instanceId = "aussieyt";
+const instanceId = process.env.ID ?? "aussieyt";
+const liveId = process.env.VID ?? "";
 
+const { postChat, ytInit, getLiveChatId } = require("./chat");
 const { LiveChat } = require("youtube-chat");
 const Redis = require("ioredis");
 const { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid } = require("../util");
@@ -7,12 +9,10 @@ const pub = new Redis(redisOpt);
 const sub = new Redis(redisOpt);
 sub.subscribe(downstreamChannel);
 
-
 // Or specify LiveID in Stream manually.
-const liveChat = new LiveChat({ liveId: "" })
+const liveChat = new LiveChat({ liveId })
 
 const processChat = (chat) => {
-  console.log(chat);
   const msg = chat?.message[0]?.text;
   const cmd = /^!(\w+)/.exec(msg);
   const id = chat?.author?.channelId;
@@ -93,14 +93,14 @@ const processCommand = async (cmd, source, msg) => {
 // Emit at start of observation chat.
 // liveId: string
 liveChat.on("start", (liveId) => {
-  console.log(JSON.stringify([instanceId, botType.YOUTUBE, msgType.STARTED, liveId]));
+  console.log("chat started");
   pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.STARTED, liveId]));
 })
 
 // Emit at end of observation chat.
 // reason: string?
 liveChat.on("end", (reason) => {
-  console.log(JSON.stringify([instanceId, botType.YOUTUBE, msgType.STOPPED, reason]));
+  console.log("chat stopped");
   pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.YOUTUBE, msgType.STOPPED, reason]));
 })
 
@@ -112,12 +112,7 @@ liveChat.on("chat", processChat);
 // err: Error or any
 liveChat.on("error", console.error)
 
-liveChat.start().then((ok) => {
-  if (!ok) {
-    console.log("Failed to start, check emitted error")
-  }
-}).catch(console.log);
-
+/*
 const readline = require('readline'), rl = readline.createInterface(process.stdin, process.stdout);
 const source = ["UCtBkiI649CihbY3MyA-91kA3", "a_llama3"];
 
@@ -125,6 +120,7 @@ rl.setPrompt('chat> ');
 rl.prompt();
 
 rl.on('line', function (line) {
+  postChat(yt, "KicKGFVDdnlRYWkwYnFJZmZHWV91WVhxMmRNZxILaVJ0c0taY2dTVTA", line);
   const cmd = /^!(\w+)/.exec(line);
   if (cmd != null) {
     processCommand(cmd[1], source, line);
@@ -135,7 +131,7 @@ rl.on('line', function (line) {
 }).on('close', function () {
   console.log('Have a great day!');
   process.exit(0);
-});
+});*/
 
 sub.on("message", (chn, msg) => {
   switch (chn) {
@@ -146,6 +142,8 @@ sub.on("message", (chn, msg) => {
       break;
   }
 });
+
+const ytChatQueue = [];
 
 const processMsg = (origMsg) => {
   let msg = null;
@@ -161,17 +159,23 @@ const processMsg = (origMsg) => {
   switch (msg[1]) {
     case msgType.POINTS: {
       const [bot_type, src_name] = msg[2], points = msg[3];
-      console.log(`@${src_name}, you have ${points} points`);
+      const text = `@${src_name} you have ${points} point(s)`;
+      ytChatQueue.push(text);
+      console.log(text);
       break;
     }
     case msgType.GIVE: {
       const [_, src_name] = msg[2], target_name = msg[3], amount = msg[4];
-      console.log(`@${src_name} gave @${target_name} ${amount} point(s)`);
+      const text = `@${src_name} gave @${target_name} ${amount} point(s)`;
+      ytChatQueue.push(text);
+      console.log(text);
       break;
     }
     case msgType.GAMBLE: {
       const [_, src_name] = msg[2], roll = msg[3], delta = msg[4], points = msg[5];
-      console.log(`gamble: @${src_name} roll ${roll} delta @${delta}, ${points} point(s)`);
+      const text = `@${src_name} rolled ${roll}, ${delta > 0 ? "won" : "lost"} ${delta > 0 ? delta : -delta} point(s), and now has ${points} point(s)`;
+      ytChatQueue.push(text);
+      console.log(text);
       break;
     }
     case msgType.COMMAND: {
@@ -179,8 +183,10 @@ const processMsg = (origMsg) => {
       const res = `@${src_name} ` + text;
       const parts = res.match(/.{1,180}(\s|$)/g); //split along word boundary, unless at end
       for (const part of parts) {
-        rl.prompt();
-        console.log(part.trim());
+        //rl.prompt();
+        const text = part.trim()
+        ytChatQueue.push(text);
+        console.log(text);
       }
       break;
     }
@@ -203,3 +209,31 @@ const rateLimited = async (id) => {
     return true;
   }
 }
+
+const ytChatInterval = 2000; //interval between posting yt msgs, in ms
+
+(async () => {
+
+  liveChat.liveId = "DqYE5mkrMlA";
+  const youtube = await ytInit();
+  const liveChatId = await getLiveChatId(youtube, liveId);
+  const ok = liveChat.start();
+
+  if (!ok) {
+    console.error("failed to start");
+    //return;
+  }
+
+  console.log("liveChatId", liveChatId);
+
+  const processChatQueue = async () => {
+    if (!ytChatQueue.length) return;
+    const msg = ytChatQueue.shift();
+    if (msg) {
+      await postChat(youtube, liveChatId, msg);
+    }
+  };
+
+  setInterval(processChatQueue, ytChatInterval);
+
+})();

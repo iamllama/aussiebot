@@ -1,4 +1,4 @@
-const instanceId = "aussiedisc";
+const instanceId = process.env.ID ?? "aussiedisc";
 
 // Require the necessary discord.js classes
 const { Client, Intents } = require('discord.js');
@@ -73,8 +73,6 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
   console.log("messageCreate");
   if (message.author.bot) return;
-  //let fullMessage = (message.partial) ? await message.fetch() : message;
-  //if (fullMessage.author.bot) return;
   const source = message.author.id;
   const text = message.content;
   if (text.startsWith('!')) processChatMsg(source, text);
@@ -124,30 +122,29 @@ const processMsg = (origMsg) => {
     case msgType.POINTS: {
       const points = msg[3];
       callbacks[id].editReply({ content: `You have ${points} point(s)` });
-      delete callbacks[id];
       break;
     }
     case msgType.GIVE: {
       const target = msg[3], amount = msg[4];
-      callbacks[id].editReply(`You gave @${target} ${amount} point(s)`);
-      delete callbacks[id];
+      callbacks[id].editReply(`You gave <@!${target}> ${amount} point(s)`);
       break;
     }
     case msgType.ERROR: {
       const text = msg[3] ?? "Error";
       callbacks[id].editReply({ content: `⚠️ ${text}`, ephemeral: true });
-      delete callbacks[id];
       break;
     }
     case msgType.GAMBLE: {
       const roll = msg[3], delta = msg[4], points = msg[5];
-      callbacks[id].editReply({ content: `gamble: roll ${roll} delta @${delta}, ${points} point(s)` });
+      const content = `You rolled ${roll}, ${delta > 0 ? "won" : "lost"} ${delta > 0 ? delta : -delta} point(s), and now have ${points} point(s)`;
+      callbacks[id].editReply({ content });
       break;
     }
     default:
       break;
   }
 
+  delete callbacks[id];
 }
 
 client.login(token);
