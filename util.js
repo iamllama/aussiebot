@@ -6,6 +6,7 @@ const redisOpt = {
   enableAutoPipelining: true,
 };
 
+const broadcastId = "aussiecast";
 const upstreamChannel = "aussieup";
 const downstreamChannel = "aussiedown";
 
@@ -26,9 +27,17 @@ const msgType = Object.freeze({
   GAMBLE: 7,
   HEIST: 8,
   LINK: 9,
-  SCRAPE_POINTS: 10
+  SCRAPE_POINTS: 10,
+});
+
+const heistResp = Object.freeze({
+  STARTED: 0,
+  JOINED: 1,
+  ENDED: 2
 });
 
 const pubMsgIsValid = (msg) => true; //TODO
 
-module.exports = { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid };
+const HEIST_KEY = "aussieheist";
+
+module.exports = { redisOpt, upstreamChannel, downstreamChannel, broadcastId, botType, msgType, pubMsgIsValid, HEIST_KEY, heistResp };

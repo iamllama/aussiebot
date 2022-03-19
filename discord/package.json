@@ -10,5 +10,13 @@
   },
   "devDependencies": {
     "eslint": "^8.11.0"
-  }
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "name": "discord",
+  "private": true,
+  "version": "1.0.0",
+  "author": "llama",
+  "license": "GPL-3.0"
 }

@@ -3,7 +3,8 @@
 const { google } = require('googleapis');
 const path = require('path');
 const { authenticate } = require('@google-cloud/local-auth');
-
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const { YT_API_KEY } = require("../env.json");
 
 const ytInit = async () => {
   // initialize the Youtube API library
@@ -21,10 +22,11 @@ const ytInit = async () => {
 
 const util = require("util");
 
+
 async function getLiveChatId(youtube, id) {
-  const res = await youtube.liveBroadcasts.list({ part: "id,snippet,contentDetails,status", id })
-  console.log(util.inspect(res, { showHidden: false, depth: null, colors: true }))
-  return res.data.items[0].snippet.liveChatId;
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${id}&key=${YT_API_KEY}`);
+  const data = await res.json();
+  return data.items[0].liveStreamingDetails.activeLiveChatId;
 }
 
 async function postChat(youtube, liveChatId, messageText) {

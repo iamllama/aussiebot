@@ -9,11 +9,12 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 
 const Redis = require("ioredis");
-const { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid } = require("../util");
+const { redisOpt, upstreamChannel, downstreamChannel, broadcastId, botType, msgType, pubMsgIsValid } = require("../util");
 const pub = new Redis(redisOpt);
 const sub = new Redis(redisOpt);
 sub.subscribe(downstreamChannel);
 
+const send = (...args) => pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, ...args]));
 const wait = require('node:timers/promises').setTimeout;
 
 // Create a new client instance
@@ -41,7 +42,7 @@ client.on('interactionCreate', async interaction => {
     case "points":
       await interaction.deferReply();
       callbacks[id] = interaction;
-      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.POINTS, id]));
+      send(msgType.POINTS, id);
       break;
     case "give": {
       await interaction.deferReply();
@@ -49,23 +50,31 @@ client.on('interactionCreate', async interaction => {
       const target = interaction.options.getUser('target', true).id;
       const amount = interaction.options.getNumber("points", true);
       console.log(target, amount);
-      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.GIVE, id, target, amount]));
+      send(msgType.GIVE, id, target, amount);
       break;
     }
     case "link": {
-      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.LINK, id]));
+      send(msgType.LINK, id);
       break;
     }
-    case "gamble":
+    case "gamble": {
       const amount = interaction.options.getNumber("points", true);
       await interaction.deferReply();
       callbacks[id] = interaction;
-      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.GAMBLE, id, amount]));
+      send(msgType.GAMBLE, id, amount);
       break;
+    }
+    case "heist": {
+      const amount = interaction.options.getNumber("points", true);
+      await interaction.deferReply();
+      callbacks[id] = interaction;
+      send(msgType.HEIST, id, amount, `${interaction.user.username}#${interaction.user.discriminator}`);
+      break;
+    }
     default:
       await interaction.deferReply();
       callbacks[id] = interaction;
-      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.COMMAND, id, commandName]));
+      send(msgType.COMMAND, id, commandName);
       break;
   }
 });
@@ -76,7 +85,7 @@ client.on('messageCreate', async message => {
   const source = message.author.id;
   const text = message.content;
   if (text.startsWith('!')) processChatMsg(source, text);
-  pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.CHAT, source]));
+  send(msgType.CHAT, source);
 });
 
 sub.on("message", (chn, msg) => {
@@ -97,7 +106,7 @@ const processChatMsg = (source, text) => {
       const cmd = /^!give <@!(\d+)> (\d+)$/.exec(text);
       if (cmd === null) break;
       console.log(source, target, amount);
-      pub.publish(upstreamChannel, JSON.stringify([instanceId, botType.DISCORD, msgType.GIVE, source, target, amount]));
+      send(msgType.GIVE, source, target, amount);
       break;
     default:
       break;
@@ -109,14 +118,14 @@ const processMsg = (origMsg) => {
   try {
     msg = JSON.parse(origMsg);
   } catch (e) {
-    debug(e);
+    console.log(e);
     return;
   }
 
-  if (!pubMsgIsValid(msg) || msg[0] != instanceId) return;
+  if (!pubMsgIsValid(msg) || (msg[0] !== instanceId && msg[0] !== broadcastId)) return;
 
   const id = msg[2];
-  if (!callbacks[id]) return;
+  if (!callbacks[id] && msg[0] !== broadcastId) return;
 
   switch (msg[1]) {
     case msgType.POINTS: {
@@ -138,6 +147,13 @@ const processMsg = (origMsg) => {
       const roll = msg[3], delta = msg[4], points = msg[5];
       const content = `You rolled ${roll}, ${delta > 0 ? "won" : "lost"} ${delta > 0 ? delta : -delta} point(s), and now have ${points} point(s)`;
       callbacks[id].editReply({ content });
+      break;
+    }
+    case msgType.HEIST: {
+      //onst roll = msg[3], delta = msg[4], points = msg[5];
+      //const content = `You rolled ${roll}, ${delta > 0 ? "won" : "lost"} ${delta > 0 ? delta : -delta} point(s), and now have ${points} point(s)`;
+      //callbacks[id].editReply({ content: "ok" });
+      console.log(msg);
       break;
     }
     default:

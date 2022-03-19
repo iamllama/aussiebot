@@ -1,31 +1,24 @@
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 const random = require('random');
 const Redis = require("ioredis");
 const db = require('./db')
-const { redisOpt, upstreamChannel, downstreamChannel, botType, msgType, pubMsgIsValid } = require("../util");
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const { redisOpt, upstreamChannel, downstreamChannel, broadcastId, botType, msgType, pubMsgIsValid, HEIST_KEY, heistResp } = require("../util");
 
-const gambleRand = random.uniformInt(1, 100);
+const rollDice = random.uniformInt(1, 100);
 
 const pub = new Redis(redisOpt);
 const sub = new Redis(redisOpt);
 sub.subscribe(upstreamChannel);
 
-sub.on("message", (chn, msg) => {
-  switch (chn) {
-    case upstreamChannel:
-      processMsg(msg);
-      break;
-    default:
-      break;
-  }
-});
+const send = (...args) => pub.publish(downstreamChannel, JSON.stringify(args));
+const informErr = (instanceId, id, msg) => send(instanceId, msgType.ERROR, id, msg);
 
 const processMsg = async (origMsg) => {
   let msg = null;
   try {
     msg = JSON.parse(origMsg);
   } catch (e) {
-    debug(e);
+    console.log(e);
     return;
   }
 
@@ -71,7 +64,7 @@ const processMsg = async (origMsg) => {
 
   switch (msg_type) {
     case msgType.POINTS:
-      pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.POINTS, src_id, src.points]));
+      send(instanceId, msgType.POINTS, src_id, src.points);
       break;
     case msgType.GIVE:
       const target_name = msg[4], amount = msg[5];
@@ -106,7 +99,7 @@ const processMsg = async (origMsg) => {
         await cl.query("BEGIN");
         await Promise.all([setUser(cl, key, { points: src.points - amount }), setUser(cl, target_key, { points: target.points + amount })]);
         await cl.query("COMMIT");
-        pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.GIVE, src_id, target_name, amount]));
+        send(instanceId, msgType.GIVE, src_id, target_name, amount);
       } catch (e) {
         await cl.query("ROLLBACK");
         informErr(instanceId, src_id, "Failed to update points");
@@ -114,15 +107,15 @@ const processMsg = async (origMsg) => {
       }
       break;
     case msgType.GAMBLE: {
-      const amount = msg[4];
-      if (10000 > amount || amount < 10) {
+      const amount = msg[4] == -1 ? Math.min(10000, src.points) : msg[4]; // -1 means all
+      if (10000 < amount || amount < 10) {
         informErr(instanceId, src_id, "Wager must be between 10 and 10000");
         break;
       } else if (src.points < amount) {
         informErr(instanceId, src_id, "Not enough points");
         break;
       }
-      const roll = gambleRand();
+      const roll = rollDice();
       let delta = 0;
       if (roll <= 50) {
         delta = -amount;
@@ -133,7 +126,7 @@ const processMsg = async (origMsg) => {
       }
       const res = await setUser(db, key, { points: src.points + delta }, ["points"]);
       const src1 = res[0];
-      pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.GAMBLE, src_id, roll, delta, src1.points]));
+      send(instanceId, msgType.GAMBLE, src_id, roll, delta, src1.points);
       break;
     }
     case msgType.COMMAND: {
@@ -143,29 +136,57 @@ const processMsg = async (origMsg) => {
         const { error, joke, vdm } = await res.json();
         if (!error) {
           const text = joke ? `${joke.question} ${joke.answer}` : vdm.content;
-          pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.COMMAND, src_id, text]));
+          send(instanceId, msgType.COMMAND, src_id, text);
         }
         break;
       }
       const res = await getCommand(db, name);
       if (res.length) {
         const text = res[0].msg;
-        pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.COMMAND, src_id, text]));
+        send(instanceId, msgType.COMMAND, src_id, text);
       }
       break;
     }
     case msgType.CHAT: {
-      console.log("CHAT", key, src.points + 2);
-      await setUser(db, key, { points: src.points + 2 });
+      const delta = msg[4] ? 1000 : 2; //superchat or not
+      const points = src.points + delta;
+      console.log("CHAT", key, points, msg[4]);
+      await setUser(db, key, { points });
       break;
+    }
+    case msgType.HEIST: {
+      const amount = msg[4] == -1 ? Math.min(10000, src.points) : msg[4]; // -1 means all
+      const name = msg[5] ?? src.ytname;
+      console.log("HEIST", name, amount);
+      if (10000 < amount || amount < 10) {
+        informErr(instanceId, src_id, "Wager must be between 10 and 10000");
+        break;
+      } else if (src.points < amount) {
+        informErr(instanceId, src_id, "Not enough points");
+        break;
+      }
+      const inProgress = await pub.exists(HEIST_KEY);
+      const set_value = JSON.stringify([name, amount * 2]);
+      if (inProgress) {
+        const notAlrJoined = await pub.hsetnx(HEIST_KEY, src.id, set_value);
+        if (notAlrJoined) {
+          await setUser(db, key, { points: src.points - amount });
+          send(broadcastId, msgType.HEIST, heistResp.JOINED, src_id, amount, name);
+        } else {
+          informErr(instanceId, src_id, "Already joined heist");
+        }
+      } else {
+        await pub.hset(HEIST_KEY, src.id, set_value);
+        await setUser(db, key, { points: src.points - amount });
+        send(broadcastId, msgType.HEIST, heistResp.STARTED, src_id, amount, name);
+        setTimeout(() => processHeist(db), 100000);
+      }
     }
     default:
       break;
   }
 
 }
-
-const informErr = (instanceId, id, msg) => pub.publish(downstreamChannel, JSON.stringify([instanceId, msgType.ERROR, id, msg]));
 
 const getKey = (type, id) => {
   const key = {};
@@ -187,21 +208,6 @@ const getKey = (type, id) => {
   console.log("getKey", key);
   return key;
 }
-
-/*
-const getOrAddUser = (db, bot_type, src_id) => {
-  const key = getKey(bot_type, src_id);
-  let res = await getUser(db, key);
-  if (!res.length) {
-    res = await addUser(db, bot_type, src_id);
-  } else if (res.length > 1) {
-    console.error("non unique id", key, res);
-    //informErr(instanceId, src_id, "Non-unique id");
-    return null;
-  }
-  const src = res[0];
-  return src;
-}*/
 
 const getUser = (db, key, col) => {
   const query = [];
@@ -264,3 +270,46 @@ const getCommand = (db, name) => {
 }
 
 const getBlague = (vdm) => fetch(`https://blague.xyz/api/${vdm ? "vdm" : "joke"}/random`, { method: "Get" });
+
+const processHeist = async (db) => {
+  const pirates = await pub.hgetall(HEIST_KEY);
+  console.log(pirates);
+  const cl = await db.getClient();
+  try {
+    const winners = Object.keys(pirates).filter(_ => rollDice() > 50);
+    const results = await Promise.all(winners.map(id => getUser(cl, { id })));
+    await cl.query("BEGIN");
+    const winner_list = [];
+    const users = results
+      .filter(res => res && res.length == 1)
+      .map(res => {
+        const user = res[0];
+        const id = user.id;
+        const name_amount = JSON.parse(pirates[id]);
+        winner_list.push(name_amount);
+        return setUser(cl, { id }, { points: user.points + name_amount[1] });
+      });
+    await Promise.all(users);
+    await cl.query("COMMIT");
+    await pub.del(HEIST_KEY);
+    send(broadcastId, msgType.HEIST, heistResp.ENDED, winner_list);
+  } catch (e) {
+    await cl.query("ROLLBACK");
+    //informErr(instanceId, src_id, "Failed to update points");
+    console.error(e);
+  }
+}
+
+(async () => {
+  await pub.del(HEIST_KEY);
+  sub.on("message", (chn, msg) => {
+    switch (chn) {
+      case upstreamChannel:
+        processMsg(msg);
+        break;
+      default:
+        break;
+    }
+  });
+})();
+

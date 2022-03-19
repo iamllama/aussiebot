@@ -1,0 +1,15 @@
+{
+  "name": "aussiebot",
+  "version": "1.0.0",
+  "repository": "https://github.com/iamllama/aussiebot",
+  "author": "llama",
+  "license": "GPL-3.0",
+  "private": true,
+  "workspaces": ["./back","./yt","./discord","./web"],
+  "scripts": {
+    "back": "node ./back/index.js",
+    "yt": "node ./yt/index.js",
+    "discord": "node ./discord/index.js",
+    "discdeploy": "node ./discord/deploy-commands.js"
+  }
+}

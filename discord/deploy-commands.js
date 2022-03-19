@@ -3,11 +3,15 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const { clientId, guildId, token } = require('./config.json');
 
+const pointsOpt = (opt) => opt.setName('points').setDescription('Amount to wager').setRequired(true);
+const userOpt = (opt) => opt.setName('target').setDescription('Select a user').setRequired(true);
+
 const commands = [
   new SlashCommandBuilder().setName('points').setDescription('CHeck your point balance'),
-  new SlashCommandBuilder().setName('gamble').setDescription('Win or lose big').addNumberOption(option => option.setName('points').setDescription('Amount to wager')),
-  new SlashCommandBuilder().setName('give').setDescription('Give points to someone').addUserOption(option => option.setName('target').setDescription('Select a user')).addNumberOption(option => option.setName('points').setDescription('Amount to give')),
-  new SlashCommandBuilder().setName('link').setDescription('Link your yt/twitch points')
+  new SlashCommandBuilder().setName('gamble').setDescription('Win or lose big').addNumberOption(pointsOpt),
+  new SlashCommandBuilder().setName('give').setDescription('Give points to someone').addUserOption(userOpt).addNumberOption(pointsOpt),
+  new SlashCommandBuilder().setName('link').setDescription('Link your yt/twitch points'),
+  new SlashCommandBuilder().setName('heist').setDescription('Start a heist 🏴‍☠️').addNumberOption(pointsOpt)
 ]
   .map(command => command.toJSON());
 

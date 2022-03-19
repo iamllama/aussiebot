@@ -11,7 +11,7 @@ Still a work in progress!
 | Give points 	| ✅ 	| ✅ 	|  	|
 | Gamble 	| ✅ 	| ✅ 	|  	|
 | Link points 	| 🔧 	| 🔧 	|  	|
-| Minigames 	|  	|  	|  	|
+| Minigames 	| 🔧 | 🔧 |  	|
 
 
   
