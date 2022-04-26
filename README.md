@@ -5,15 +5,19 @@ A yt-discord-twitch bot system
 Still a work in progress!
 
 ### Progress
-| Features 	| Youtube 	| Discord 	| Twitch 	|
-|---	|---	|---	|---	|
-| Check points 	| ✅ 	| ✅ 	|  	|
-| Give points 	| ✅ 	| ✅ 	|  	|
-| Gamble 	| ✅ 	| ✅ 	|  	|
-| Link points 	| 🔧 	| 🔧 	|  	|
-| Minigames 	| 🔧 | 🔧 |  	|
-
-
+| Features 	| Youtube 	| Discord 	| Twitch 	| Web |
+|---	|---	|---	|---	|--- |
+| Check points 	| ✅ 	| ✅ 	|  	| |
+| Give points 	| ✅ 	| ✅ 	|  	| |
+| Gamble 	| ✅ 	| ✅ 	|  	| |
+| Link points 	| 🔧 	| 🔧 	|  	| |
+| Minigames 	| ✅ |  |  	| |
+| Chat filter	| ✅ | ✅ |  	| |
+| Moderation	| ✅ |  |  	| |
+| Send pings across platforms | ✅ | ✅ |  	| |
+| Timed messages 	| ✅ |  |  	| |
+| Auto start/stop 	| ✅ |  |  	| |
+| Configurable | ✅ | | | 🔧 |
   
 # Why
 
@@ -21,17 +25,25 @@ Cloudbot replacement, for tracking points and hours and hosting minigames
 
 # Structure
 
-## back
+## ~~back~~
 
-backend engine that links the bots to the database.
+~~backend engine that links the bots to the database. (DISCONTINUED)~~
 
-## yt
+## backrs
 
- youtube chatbot
+backend engine rewritten in rust
+ 
+## ~~yt~~
 
-## discord
+ ~~youtube chatbot~~
 
-discord chatbot
+## ~~discord~~
+
+~~discord chatbot (DISCONTINUED)~~
+
+## discordrs
+
+discord chatbot rewritten in rust
 
 ## twitch
 

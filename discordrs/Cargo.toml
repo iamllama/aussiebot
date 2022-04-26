@@ -1,0 +1,21 @@
+[package]
+name = "discordrs"
+version = "0.1.0"
+edition = "2021"
+authors = ["llama"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.17.0", features = ["full"] }
+dotenv = "0.15.0"
+serenity = { version = "*", default-features = false, features = ["client", "gateway", "rustls_backend", "model", "utils", "cache"] }
+bb8-redis = "0.10"
+redis = { version = "0.21.5", features = ["tokio-comp"] }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+parking_lot = "0.12"
+chrono = "0.4"
+regex = "*"
+once_cell = "1.10.0"
