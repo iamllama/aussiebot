@@ -1,0 +1,1 @@
+SELECT last_seen, time_watched FROM discord WHERE platform_id = $1 FOR UPDATE;

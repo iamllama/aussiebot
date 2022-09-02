@@ -1,0 +1,1 @@
+SELECT platform_id, disp_name, discord_points FROM discord WHERE platform_id = $1 FOR UPDATE;

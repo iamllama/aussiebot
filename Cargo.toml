@@ -1,0 +1,11 @@
+[workspace]
+members = ["back", "back_derive", "discord"]
+
+# incrementtal compilation breaks build and clippy
+# [profile.release]
+# strip = "debuginfo"
+# incremental = true
+
+[profile.release]
+lto = "thin"
+codegen-units = 256

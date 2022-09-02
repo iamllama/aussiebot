@@ -1,0 +1,1 @@
+DELETE FRom link_tw WHERE discord_id = $1;

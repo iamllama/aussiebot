@@ -1,0 +1,1 @@
+SELECT platform_id, disp_name, youtube_points FROM youtube WHERE platform_id = $1 FOR UPDATE;

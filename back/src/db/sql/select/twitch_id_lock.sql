@@ -1,0 +1,1 @@
+SELECT platform_id, disp_name, twitch_points FROM twitch WHERE platform_id = $1 FOR UPDATE;

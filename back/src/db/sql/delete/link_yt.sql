@@ -1,0 +1,1 @@
+DELETE FRom link_yt WHERE discord_id = $1;
